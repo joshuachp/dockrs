@@ -81,7 +81,8 @@
                   rust-analyzer
                   pre-commit
 
-                  cargo-edit
+                  openssl
+                  pkg-config
                 ];
               };
         });
