@@ -40,9 +40,9 @@ pub trait Docker: Sized {
         container_name: &str,
         options: Option<AttachContainerOptions<&'a str>>,
     ) -> Result<AttachContainerResults, Error>;
-    fn create_image<'a>(
+    fn create_image(
         &self,
-        options: Option<CreateImageOptions<&'a str>>,
+        options: Option<CreateImageOptions<String>>,
         root_fs: Option<Body>,
         credentials: Option<DockerCredentials>,
     ) -> Pin<Box<dyn Stream<Item = Result<CreateImageInfo, Error>>>>;

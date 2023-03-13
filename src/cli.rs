@@ -33,6 +33,9 @@ pub enum Command {
     Pull {
         /// The image to pull
         image: String,
+        /// The tag to pull
+        #[arg(short, long, default_value = "latest")]
+        tag: String,
     },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },

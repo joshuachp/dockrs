@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
 
     match cli.subcommand {
         Command::Run(ref run) => dockrs::run(run.into(), run.try_into()?, run.rm).await?,
-        Command::Pull { image } => dockrs::pull(&image).await?,
+        Command::Pull { image, tag } => dockrs::pull(&image, &tag).await?,
         Command::Completion { shell } => Cli::generate_completion(shell),
     }
 
