@@ -59,11 +59,11 @@ pub async fn run(image: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn pull(image: &str) -> Result<()> {
+pub async fn pull(image: &str, tag: &str) -> Result<()> {
     let docker = connect_to_docker()?;
 
     let options = CreateImageOptions {
-        from_image: image,
+        from_image: format!("{}:{}", image, tag),
         ..Default::default()
     };
 
