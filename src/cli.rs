@@ -18,9 +18,10 @@ impl Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    Run,
-    /// Generate shell completion for a given shell
-    Completion {
-        shell: Shell,
+    Run {
+        /// The image to run
+        image: String,
     },
+    /// Generate shell completion for a given shell
+    Completion { shell: Shell },
 }

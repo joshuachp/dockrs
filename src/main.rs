@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.subcommand {
-        cli::Command::Run => println!("Run"),
+        cli::Command::Run { image } => dockrs::run(&image).await?,
         cli::Command::Completion { shell } => Cli::generate_completion(shell),
     }
 
