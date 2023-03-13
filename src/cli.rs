@@ -37,6 +37,8 @@ pub enum Command {
         #[arg(short, long, default_value = "latest")]
         tag: String,
     },
+    /// Show statistics about the containers
+    Stats,
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }

@@ -1,20 +1,23 @@
-use std::{collections::HashMap, fmt::Display, ops::Deref};
+use std::{collections::HashMap, fmt::Display, ops::Deref, sync::Arc};
 
-#[cfg(not(feature = "mock"))]
-use bollard::Docker;
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
-        StartContainerOptions,
+        ListContainersOptions, StartContainerOptions, Stats, StatsOptions,
     },
     image::CreateImageOptions,
     service::PortBinding,
 };
 use color_eyre::{eyre::ContextCompat, Result};
 use futures::StreamExt;
+use tokio::sync::Mutex;
+use tracing::{debug, info, instrument, trace, warn};
+
+#[cfg(not(feature = "mock"))]
+use bollard::Docker;
 #[cfg(feature = "mock")]
-use mock::{Docker as DockerTrait, MockDocker as Docker};
-use tracing::{instrument, warn};
+use mock::{DockerTrait, MockDocker as Docker};
+
 pub mod cli;
 #[cfg(feature = "mock")]
 mod mock;
@@ -129,18 +132,87 @@ pub async fn pull(docker: &Docker, image: &str, tag: &str) -> Result<()> {
     Ok(())
 }
 
+#[instrument(skip(docker))]
+async fn recv_stats(
+    docker: &Docker,
+    id: &str,
+    options: StatsOptions,
+    stat: Arc<Mutex<Option<Stats>>>,
+) -> Result<()> {
+    let mut stream = docker.stats(id, Some(options));
+
+    debug!("Waiting for first stats item");
+
+    while let Some(item) = stream.next().await {
+        trace!(?item);
+
+        stat.lock().await.replace(item?);
+    }
+
+    Ok(())
+}
+
+pub async fn stats(docker: &Docker) -> Result<()> {
+    let options = ListContainersOptions::<&str> {
+        all: true,
+        ..Default::default()
+    };
+
+    let containers = docker.list_containers(Some(options)).await?;
+
+    info!("Found {} containers", containers.len());
+
+    let mut stats: Vec<Arc<Mutex<Option<Stats>>>> = Vec::with_capacity(containers.len());
+
+    let options = StatsOptions {
+        stream: true,
+        ..Default::default()
+    };
+
+    for container in containers {
+        let id = container.id.wrap_err("Container without id")?;
+        let stat: Arc<Mutex<Option<Stats>>> = Arc::new(Mutex::new(None));
+
+        stats.push(stat.clone());
+
+        let dc_clone = docker.clone();
+
+        debug!("Spawning stats task for {}", id);
+
+        tokio::spawn(async move { recv_stats(&dc_clone, &id, options, stat).await });
+    }
+
+    debug!("Starting stats loop");
+
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+
+    loop {
+        interval.tick().await;
+
+        // TODO: This is not the best way to clear the screen
+        print!("\x1B[2J\x1B[1;1H");
+
+        for stat in &stats {
+            let stat = stat.lock().await;
+
+            if let Some(stat) = &*stat {
+                println!("{:?}", stat);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     macro_rules! docker_test {
         ($mock:expr) => {{
-            let docker: Docker = if cfg!(feature = "mock") {
-                $mock
-            } else {
-                connect_to_docker().unwrap()
-            };
+            #[cfg(feature = "mock")]
+            let docker: Docker = $mock;
+
+            #[cfg(not(feature = "mock"))]
+            let docker: Docker = connect_to_docker().unwrap();
 
             docker
         }};

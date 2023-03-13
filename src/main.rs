@@ -32,6 +32,7 @@ async fn main() -> Result<()> {
     match cli.subcommand {
         Command::Run(ref run) => dockrs::run(&docker, run.into(), run.try_into()?, run.rm).await?,
         Command::Pull { image, tag } => dockrs::pull(&docker, &image, &tag).await?,
+        Command::Stats => dockrs::stats(&docker).await?,
         Command::Completion { .. } => unreachable!(),
     }
 
