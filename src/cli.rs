@@ -22,6 +22,10 @@ pub enum Command {
         /// The image to run
         image: String,
     },
+    Pull {
+        /// The image to pull
+        image: String,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }

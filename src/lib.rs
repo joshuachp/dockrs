@@ -1,13 +1,20 @@
 use bollard::{
     container::{AttachContainerOptions, AttachContainerResults, Config},
+    image::CreateImageOptions,
     Docker,
 };
 use color_eyre::Result;
 use futures::StreamExt;
 use tracing::warn;
 
-pub async fn run(image: &str) -> Result<()> {
+fn connect_to_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()?;
+
+    Ok(docker)
+}
+
+pub async fn run(image: &str) -> Result<()> {
+    let docker = connect_to_docker()?;
 
     let config = Config {
         image: Some(image),
@@ -48,6 +55,25 @@ pub async fn run(image: &str) -> Result<()> {
     join.await?;
 
     docker.remove_container(&container.id, None).await?;
+
+    Ok(())
+}
+
+pub async fn pull(image: &str) -> Result<()> {
+    let docker = connect_to_docker()?;
+
+    let options = CreateImageOptions {
+        from_image: image,
+        ..Default::default()
+    };
+
+    let mut stream = docker.create_image(Some(options), None, None);
+
+    while let Some(info) = stream.next().await {
+        let info = info?;
+
+        println!("{:?}", info);
+    }
 
     Ok(())
 }

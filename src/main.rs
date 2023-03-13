@@ -18,6 +18,8 @@ async fn main() -> Result<()> {
 
     match cli.subcommand {
         cli::Command::Run { image } => dockrs::run(&image).await?,
+        cli::Command::Pull { image } => dockrs::pull(&image).await?,
+
         cli::Command::Completion { shell } => Cli::generate_completion(shell),
     }
 
