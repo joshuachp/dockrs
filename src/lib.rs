@@ -15,7 +15,6 @@ use futures::StreamExt;
 #[cfg(feature = "mock")]
 use mock::{Docker as DockerTrait, MockDocker as Docker};
 use tracing::{instrument, warn};
-
 pub mod cli;
 #[cfg(feature = "mock")]
 mod mock;
