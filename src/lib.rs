@@ -1,6 +1,6 @@
 use color_eyre::{eyre::Context, Result};
 use futures::StreamExt;
-use shiplift::{tty::TtyChunk, ContainerOptions, Docker};
+use shiplift::{tty::TtyChunk, ContainerOptions, Docker, PullOptions};
 use tracing::{error, trace};
 
 pub async fn run(image: &str) -> Result<()> {
@@ -35,6 +35,25 @@ pub async fn run(image: &str) -> Result<()> {
     }
 
     trace!("Container exited: {}", container_info.id);
+
+    Ok(())
+}
+
+pub async fn pull(image: &str) -> Result<()> {
+    let docker = Docker::new();
+
+    trace!("Pulling image: {}", image);
+
+    let mut stream = docker
+        .images()
+        .pull(&PullOptions::builder().image(image).build());
+
+    while let Some(result) = stream.next().await {
+        match result {
+            Ok(chunk) => println!("{}", chunk),
+            Err(e) => error!("{}", e),
+        }
+    }
 
     Ok(())
 }

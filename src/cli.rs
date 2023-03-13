@@ -18,7 +18,13 @@ impl Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Run creates and runs a container
     Run {
+        /// The image to run
+        image: String,
+    },
+    /// Pull an image from a registry
+    Pull {
         /// The image to run
         image: String,
     },
