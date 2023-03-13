@@ -17,7 +17,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - name: cargo fmt --check
+      - name: Check formatting
         run: cargo fmt --check
   clippy:
     runs-on: ubuntu-latest
@@ -38,7 +38,7 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
           components: clippy
-      - name: cargo clippy
+      - name: Run cargo clippy
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -51,7 +51,7 @@ jobs:
           submodules: true
       - name: Install nightly
         uses: dtolnay/rust-toolchain@nightly
-      - name: cargo doc
+      - name: Run cargo doc
         run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: --cfg docsrs
@@ -71,5 +71,5 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.msrv }}
-      - name: cargo +${{ matrix.msrv }} check
+      - name: Run cargo +${{ matrix.msrv }} check
         run: cargo check
