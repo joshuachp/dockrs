@@ -1,12 +1,18 @@
+use std::pin::Pin;
+
 use async_trait::async_trait;
 use bollard::{
+    auth::DockerCredentials,
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         RemoveContainerOptions, StartContainerOptions,
     },
     errors::Error,
-    models::ContainerCreateResponse,
+    image::CreateImageOptions,
+    models::{ContainerCreateResponse, CreateImageInfo},
 };
+use futures::Stream;
+use hyper::Body;
 use mockall::automock;
 
 #[automock]
@@ -34,4 +40,10 @@ pub trait Docker: Sized {
         container_name: &str,
         options: Option<AttachContainerOptions<&'a str>>,
     ) -> Result<AttachContainerResults, Error>;
+    fn create_image<'a>(
+        &self,
+        options: Option<CreateImageOptions<&'a str>>,
+        root_fs: Option<Body>,
+        credentials: Option<DockerCredentials>,
+    ) -> Pin<Box<dyn Stream<Item = Result<CreateImageInfo, Error>>>>;
 }

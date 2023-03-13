@@ -7,6 +7,7 @@ use bollard::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         StartContainerOptions,
     },
+    image::CreateImageOptions,
     service::PortBinding,
 };
 use color_eyre::{eyre::ContextCompat, Result};
@@ -108,6 +109,25 @@ pub async fn run(
 
     if rm {
         docker.remove_container(&container.id, None).await?;
+    }
+
+    Ok(())
+}
+
+pub async fn pull(image: &str) -> Result<()> {
+    let docker = connect_to_docker()?;
+
+    let options = CreateImageOptions {
+        from_image: image,
+        ..Default::default()
+    };
+
+    let mut stream = docker.create_image(Some(options), None, None);
+
+    while let Some(info) = stream.next().await {
+        let info = info?;
+
+        println!("{:?}", info);
     }
 
     Ok(())

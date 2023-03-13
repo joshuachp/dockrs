@@ -326,6 +326,7 @@ dependencies = [
  "clap_complete",
  "color-eyre",
  "futures",
+ "hyper",
  "mockall",
  "pretty_assertions",
  "tokio",
