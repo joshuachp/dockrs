@@ -9,6 +9,11 @@ use bollard::{
     service::PortBinding,
 };
 use color_eyre::{eyre::ContextCompat, Result};
+use crossterm::{
+    cursor::MoveToRow,
+    execute,
+    terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use futures::StreamExt;
 
 #[cfg(not(feature = "mock"))]
