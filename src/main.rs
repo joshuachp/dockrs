@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
         .init();
 
     match cli.subcommand {
-        cli::Command::Run(ref run) => dockrs::run(run.into(), run.into(), run.rm).await?,
+        cli::Command::Run(ref run) => dockrs::run(run.into(), run.try_into()?, run.rm).await?,
         cli::Command::Completion { shell } => Cli::generate_completion(shell),
     }
 
