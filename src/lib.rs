@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::stdout, sync::Arc};
 
 use bollard::{
     container::{
@@ -9,8 +9,13 @@ use bollard::{
     Docker,
 };
 use color_eyre::{eyre::ContextCompat, Result};
+use crossterm::{
+    cursor::MoveToRow,
+    execute,
+    terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use futures::StreamExt;
-use tokio::sync::Mutex;
+use tokio::{signal::ctrl_c, sync::Mutex};
 use tracing::{debug, info, instrument, trace, warn};
 
 fn connect_to_docker() -> Result<Docker> {
@@ -140,11 +145,16 @@ pub async fn stats() -> Result<()> {
 
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
 
-    loop {
-        interval.tick().await;
+    execute!(stdout(), EnterAlternateScreen)?;
 
-        // TODO: This is not the best way to clear the screen
-        print!("\x1B[2J\x1B[1;1H");
+    tokio::spawn(async move {
+        ctrl_c().await.unwrap();
+        execute!(stdout(), LeaveAlternateScreen).unwrap();
+        std::process::exit(0);
+    });
+
+    loop {
+        execute!(stdout(), Clear(ClearType::All), MoveToRow(0))?;
 
         for stat in &stats {
             let stat = stat.lock().await;
@@ -153,5 +163,7 @@ pub async fn stats() -> Result<()> {
                 println!("{:?}", stat);
             }
         }
+
+        interval.tick().await;
     }
 }
