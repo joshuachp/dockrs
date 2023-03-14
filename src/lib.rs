@@ -189,7 +189,7 @@ pub async fn stats(docker: &Docker) -> Result<()> {
 
     debug!("Starting stats loop");
 
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
 
     execute!(stdout(), EnterAlternateScreen)?;
 
@@ -202,12 +202,48 @@ pub async fn stats(docker: &Docker) -> Result<()> {
     loop {
         execute!(stdout(), Clear(ClearType::All), MoveToRow(0))?;
 
+        println!("Container ID\tName\tCPU\tMemory\tNetwork\tBlock I/O");
+
         for stat in &stats {
             let stat = stat.lock().await;
 
-            if let Some(stat) = &*stat {
-                println!("{:?}", stat);
-            }
+            let id = stat.as_ref().map(|s| s.id.as_str()).unwrap_or("-");
+            let name = stat.as_ref().map(|s| s.name.as_str()).unwrap_or("-");
+
+            let cpu = stat
+                .as_ref()
+                .map(|s| s.cpu_stats.cpu_usage.total_usage.to_string())
+                .unwrap_or_else(|| "-".to_string());
+
+            let memory = stat
+                .as_ref()
+                .and_then(|s| s.memory_stats.usage)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "-".to_string());
+
+            let net = stat
+                .as_ref()
+                .and_then(|s| s.network)
+                .map(|s| s.rx_bytes.to_string())
+                .unwrap_or_else(|| "-".to_string());
+
+            let (read, write) = stat
+                .as_ref()
+                .map(|s| s.storage_stats)
+                .map(|s| {
+                    (
+                        s.read_size_bytes
+                            .map_or_else(|| "-".to_string(), |s| s.to_string()),
+                        s.write_size_bytes
+                            .map_or_else(|| "-".to_string(), |s| s.to_string()),
+                    )
+                })
+                .unwrap_or_else(|| ("-".to_string(), "-".to_string()));
+
+            println!(
+                "{}\t{}\t{}\t{}\t{}\t{}/{}",
+                id, name, cpu, memory, net, read, write
+            );
         }
 
         interval.tick().await;
