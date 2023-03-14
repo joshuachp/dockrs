@@ -6,7 +6,7 @@ use color_eyre::Result;
 use futures::StreamExt;
 use tracing::{instrument, warn};
 
-#[instrument]
+#[instrument(skip(options, config))]
 pub async fn run(
     options: Option<CreateContainerOptions<&str>>,
     config: Config<&str>,
