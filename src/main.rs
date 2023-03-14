@@ -1,6 +1,7 @@
 use clap::Parser;
 use cli::Cli;
 use color_eyre::Result;
+use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 pub mod cli;
@@ -9,15 +10,21 @@ pub mod cli;
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(EnvFilter::from_default_env())
-        .init();
+    let mut filter = EnvFilter::from_default_env();
 
     let cli = Cli::parse();
 
+    if cli.debug {
+        filter = filter.add_directive(LevelFilter::TRACE.into());
+    }
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(filter)
+        .init();
+
     match cli.subcommand {
-        cli::Command::Run { image } => dockrs::run(&image).await?,
+        cli::Command::Run(ref run) => dockrs::run(run.into(), run.into(), run.rm).await?,
         cli::Command::Completion { shell } => Cli::generate_completion(shell),
     }
 
