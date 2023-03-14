@@ -1,22 +1,22 @@
 use bollard::{
-    container::{AttachContainerOptions, AttachContainerResults, Config},
+    container::{AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions},
     Docker,
 };
 use color_eyre::Result;
 use futures::StreamExt;
-use tracing::warn;
+use tracing::{instrument, warn};
 
-pub async fn run(image: &str) -> Result<()> {
+#[instrument]
+pub async fn run(
+    options: Option<CreateContainerOptions<&str>>,
+    config: Config<&str>,
+    rm: bool,
+) -> Result<()> {
     let docker = Docker::connect_with_local_defaults()?;
 
-    let config = Config {
-        image: Some(image),
-        attach_stdout: Some(true),
-        tty: Some(true),
-        ..Default::default()
-    };
-
-    let container = docker.create_container::<&str, &str>(None, config).await?;
+    let container = docker
+        .create_container::<&str, &str>(options, config)
+        .await?;
 
     if !container.warnings.is_empty() {
         warn!("Warnings while creating the container");
@@ -47,7 +47,9 @@ pub async fn run(image: &str) -> Result<()> {
 
     join.await?;
 
-    docker.remove_container(&container.id, None).await?;
+    if rm {
+        docker.remove_container(&container.id, None).await?;
+    }
 
     Ok(())
 }
