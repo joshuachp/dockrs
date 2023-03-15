@@ -50,7 +50,11 @@ impl Containers {
             let dc_clone = docker.clone();
             let id_c = id.to_string();
 
-            tokio::spawn(async move { recv_stats(&dc_clone, &id_c, options, stat).await });
+            tokio::spawn(async move {
+                if let Err(err) = recv_stats(&dc_clone, &id_c, options, stat).await {
+                    error!(?err, "Error while receiving stats for container {}", id_c);
+                }
+            });
         }
 
         Ok(())
