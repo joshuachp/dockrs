@@ -136,19 +136,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "complete"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90a6dd7624ed7f4c67cbe5cc6c4810e623a61717b4f61bfa0bfe33d46ff621f7"
-
-[[package]]
 name = "dockrs"
 version = "0.1.0"
 dependencies = [
  "clap",
  "clap_complete",
  "color-eyre",
- "complete",
  "tokio",
  "tracing",
  "tracing-subscriber",
