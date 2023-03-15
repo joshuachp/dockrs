@@ -8,12 +8,7 @@ use bollard::{
     image::CreateImageOptions,
     service::PortBinding,
 };
-use color_eyre::{eyre::ContextCompat, Result};
-use crossterm::{
-    cursor::MoveToRow,
-    execute,
-    terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
-};
+use color_eyre::{Result, eyre::ContextCompat};
 use futures::StreamExt;
 
 #[cfg(not(feature = "mock"))]
@@ -263,3 +258,4 @@ mod test {
         assert!(result.is_ok(), "pull failed with {:?}", result);
     }
 }
+
