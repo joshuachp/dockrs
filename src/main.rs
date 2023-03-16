@@ -45,6 +45,13 @@ async fn main() -> Result<()> {
             follow,
             tail,
         } => dockrs::logs(&docker, &container, follow, tail).await?,
+        Command::Rm {
+            containers,
+            force,
+            volumes,
+            link,
+        } => dockrs::rm(&docker, &containers, force, volumes, link).await?,
+        Command::Rmi { images, force } => dockrs::rmi(&docker, &images, force).await?,
         Command::Completion { .. } => unreachable!(),
     }
 

@@ -3,9 +3,9 @@ use std::{collections::HashMap, fmt::Display, ops::Deref};
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions, LogOutput,
-        LogsOptions, StartContainerOptions,
+        LogsOptions, RemoveContainerOptions, StartContainerOptions,
     },
-    image::CreateImageOptions,
+    image::{CreateImageOptions, RemoveImageOptions},
     service::PortBinding,
 };
 use color_eyre::{eyre::ensure, eyre::ContextCompat, Result};
@@ -300,6 +300,84 @@ pub async fn logs(
         let info = info?;
 
         print!("{}", info);
+    }
+
+    Ok(())
+}
+
+pub async fn rm(
+    docker: &Docker,
+    containers: &[String],
+    force: bool,
+    volumes: bool,
+    link: bool,
+) -> Result<()> {
+    let options = RemoveContainerOptions {
+        force,
+        v: volumes,
+        link,
+    };
+
+    let removes = containers.iter().map(|container| {
+        let docker = docker.clone();
+        let container = container.clone();
+
+        tokio::spawn(async move {
+            let res = docker.remove_container(&container, Some(options)).await;
+            (container, res)
+        })
+    });
+
+    for join in join_all(removes).await {
+        match join {
+            Ok((container, Ok(()))) => {
+                println!("{container}");
+            }
+            Ok((container, Err(err))) => {
+                error!(?container, ?err, "Failed to remove container");
+            }
+            Err(e) => {
+                error!(?e, "Failed to remove container");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn rmi(docker: &Docker, images: &[String], force: bool) -> Result<()> {
+    let options = RemoveImageOptions {
+        force,
+        ..Default::default()
+    };
+
+    let removes = images.iter().map(|image| {
+        let docker = docker.clone();
+        let image = image.clone();
+
+        tokio::spawn(async move { docker.remove_image(&image, Some(options), None).await })
+    });
+
+    for join in join_all(removes).await {
+        match join {
+            Ok(Ok(responses)) => {
+                for resp in responses {
+                    if let Some(untaged) = resp.untagged {
+                        println!("Untagged: {}", untaged);
+                    }
+
+                    if let Some(deleted) = resp.deleted {
+                        println!("Deleted: {}", deleted);
+                    }
+                }
+            }
+            Ok(Err(err)) => {
+                error!(?err, "Failed to remove image");
+            }
+            Err(e) => {
+                error!(?e, "Failed to remove image");
+            }
+        }
     }
 
     Ok(())

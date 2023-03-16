@@ -84,6 +84,30 @@ pub enum Command {
         #[arg(long, short = 'n')]
         tail: Option<usize>,
     },
+    /// Remove one or more containers
+    Rm {
+        /// The containers to remove
+        #[arg(required = true)]
+        containers: Vec<String>,
+        /// Force the removal of a running container (uses SIGKILL)
+        #[arg(long, short)]
+        force: bool,
+        /// Remove anonymous volumes associated with the container
+        #[arg(long, short)]
+        volumes: bool,
+        /// Remove the specified link
+        #[arg(long, short)]
+        link: bool,
+    },
+    /// Remove one or more images
+    Rmi {
+        /// The images to remove
+        #[arg(required = true)]
+        images: Vec<String>,
+        /// Force removal of the image
+        #[arg(long, short)]
+        force: bool,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }
