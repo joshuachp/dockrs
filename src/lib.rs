@@ -16,9 +16,11 @@ use bollard::Docker;
 #[cfg(feature = "mock")]
 use mock::{DockerTrait, MockDocker as Docker};
 
+pub use list::list;
 pub use stats::stats;
 
 pub mod cli;
+mod list;
 #[cfg(feature = "mock")]
 mod mock;
 mod stats;
