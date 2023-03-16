@@ -43,6 +43,24 @@ pub enum Command {
         #[arg(long)]
         keep_screen: bool,
     },
+    /// Start one or more stopped containers
+    Start {
+        /// The container to start
+        #[arg(required = true)]
+        containers: Vec<String>,
+        /// Attach STDOUT/STDERR and forward signals
+        #[arg(short, long)]
+        attach: bool,
+        /// Attach container's STDIN
+        #[arg(short, long)]
+        interactive: bool,
+    },
+    /// Stop one or more running containers
+    Stop {
+        /// The container to stop
+        #[arg(required = true)]
+        containers: Vec<String>,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }

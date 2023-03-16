@@ -2,14 +2,14 @@ use std::{collections::HashMap, fmt::Display, ops::Deref};
 
 use bollard::{
     container::{
-        AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
+        AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions, LogOutput,
         StartContainerOptions,
     },
     image::CreateImageOptions,
     service::PortBinding,
 };
-use color_eyre::{Result, eyre::ContextCompat};
-use futures::StreamExt;
+use color_eyre::{eyre::ensure, eyre::ContextCompat, Result};
+use futures::{future::join_all, StreamExt};
 
 #[cfg(not(feature = "mock"))]
 use bollard::Docker;
@@ -23,7 +23,11 @@ pub mod cli;
 mod mock;
 mod stats;
 
-use tracing::{instrument, warn};
+use tokio::{
+    io::{stderr, stdout, AsyncBufReadExt, AsyncWriteExt},
+    task::JoinHandle,
+};
+use tracing::{error, instrument, warn};
 
 pub fn connect_to_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()?;
@@ -71,6 +75,60 @@ pub fn get_port_bindings<T: Deref<Target = str> + Display>(
     Ok(bindings)
 }
 
+async fn attach_container(
+    docker: &Docker,
+    container: &str,
+    interactive: bool,
+) -> Result<Vec<JoinHandle<Result<()>>>> {
+    let options = AttachContainerOptions::<&str> {
+        stream: Some(true),
+        stdin: Some(interactive),
+        stdout: Some(true),
+        stderr: Some(true),
+        ..Default::default()
+    };
+
+    let AttachContainerResults {
+        mut output,
+        mut input,
+    } = docker.attach_container(container, Some(options)).await?;
+
+    let join: JoinHandle<Result<()>> = tokio::spawn(async move {
+        let mut stdout = stdout();
+        let mut stderr = stderr();
+
+        while let Some(chunk) = output.next().await {
+            match chunk? {
+                LogOutput::StdOut { message } => stdout.write(&message).await?,
+                LogOutput::StdErr { message } => stderr.write(&message).await?,
+                LogOutput::StdIn { .. } => unreachable!("We didn't ask for stdin"),
+                LogOutput::Console { message } => stdout.write(&message).await?,
+            };
+
+            stdout.flush().await?;
+            stderr.flush().await?;
+        }
+
+        Ok(())
+    });
+
+    if interactive {
+        let out: JoinHandle<Result<()>> = tokio::spawn(async move {
+            let mut buf = String::new();
+            let mut stdin = tokio::io::BufReader::new(tokio::io::stdin());
+
+            loop {
+                stdin.read_line(&mut buf).await?;
+                input.write_all(buf.as_bytes()).await?;
+            }
+        });
+
+        return Ok(vec![join, out]);
+    }
+
+    Ok(vec![join])
+}
+
 #[instrument(skip(options, config))]
 pub async fn run(
     docker: &Docker,
@@ -87,29 +145,13 @@ pub async fn run(
         }
     }
 
-    let options = AttachContainerOptions::<&str> {
-        stream: Some(true),
-        stdin: Some(false),
-        stdout: Some(true),
-        stderr: Some(true),
-        ..Default::default()
-    };
-
-    let AttachContainerResults { mut output, .. } = docker
-        .attach_container(&container.id, Some(options))
-        .await?;
-
-    let join = tokio::spawn(async move {
-        while let Some(chunk) = output.next().await {
-            print!("{}", chunk.unwrap());
-        }
-    });
+    let join = attach_container(&docker, &container.id, false).await?;
 
     docker
         .start_container(&container.id, None::<StartContainerOptions<&str>>)
         .await?;
 
-    join.await?;
+    join_all(join).await;
 
     if rm {
         docker.remove_container(&container.id, None).await?;
@@ -130,6 +172,90 @@ pub async fn pull(docker: &Docker, image: &str, tag: &str) -> Result<()> {
         let info = info?;
 
         println!("{:?}", info);
+    }
+
+    Ok(())
+}
+
+#[instrument]
+pub async fn start(containers: &[String], attach: bool, interactive: bool) -> Result<()> {
+    ensure!(
+        containers.len() == 1 || (!attach && !interactive),
+        "Can only attach to one container at a time"
+    );
+
+    let docker = connect_to_docker()?;
+
+    let options = StartContainerOptions::<&str> {
+        ..Default::default()
+    };
+
+    let mut attach_join: Vec<JoinHandle<Result<()>>> = Vec::new();
+    if attach || interactive {
+        for container in containers {
+            attach_join = attach_container(&docker, container, interactive).await?;
+        }
+    }
+
+    let starts = containers.iter().map(|container| {
+        let docker = docker.clone();
+        let options = options.clone();
+        let container = container.clone();
+
+        tokio::spawn(async move {
+            let res = docker.start_container(&container, Some(options)).await;
+            (container, res)
+        })
+    });
+
+    for join in join_all(starts).await {
+        match join {
+            Ok((container, Ok(()))) => {
+                println!("{container}");
+            }
+            Ok((container, Err(err))) => {
+                error!(?container, ?err, "Failed to start container");
+            }
+            Err(e) => {
+                error!(?e, "Failed to start container");
+            }
+        }
+    }
+
+    if attach || interactive {
+        for join in join_all(attach_join).await {
+            join??;
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn stop(containers: &[String]) -> Result<()> {
+    let docker = connect_to_docker()?;
+
+    let stops = containers.iter().map(|container| {
+        let docker = docker.clone();
+        let container = container.clone();
+
+        tokio::spawn(async move {
+            let res = docker.stop_container(&container, None).await;
+            (container, res)
+        })
+    });
+
+    for join in join_all(stops).await {
+        match join {
+            Ok((container, Ok(()))) => {
+                println!("{container}");
+            }
+            Ok((container, Err(err))) => {
+                error!(?container, ?err, "Failed to stop container");
+            }
+            Err(e) => {
+                error!(?e, "Failed to stop container");
+            }
+        }
     }
 
     Ok(())
@@ -258,4 +384,3 @@ mod test {
         assert!(result.is_ok(), "pull failed with {:?}", result);
     }
 }
-
