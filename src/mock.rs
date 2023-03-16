@@ -5,8 +5,8 @@ use bollard::{
     auth::DockerCredentials,
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
-        ListContainersOptions, RemoveContainerOptions, StartContainerOptions, Stats, StatsOptions,
-        StopContainerOptions,
+        ListContainersOptions, LogOutput, LogsOptions, RemoveContainerOptions,
+        StartContainerOptions, Stats, StatsOptions, StopContainerOptions,
     },
     errors::Error,
     image::CreateImageOptions,
@@ -59,6 +59,11 @@ pub trait DockerTrait: Sized {
         container_name: &str,
         options: Option<StopContainerOptions>,
     ) -> Result<(), Error>;
+    fn logs<'a>(
+        &self,
+        container_name: &str,
+        options: Option<LogsOptions<String>>,
+    ) -> DockerStream<LogOutput>;
 }
 
 mock! {
@@ -107,5 +112,10 @@ mock! {
             container_name: &str,
             options: Option<StopContainerOptions>,
         ) -> Result<(), Error>;
+        fn logs(
+            &self,
+            container_name: &str,
+            options: Option<LogsOptions<String>>,
+        ) -> DockerStream<LogOutput>;
     }
 }

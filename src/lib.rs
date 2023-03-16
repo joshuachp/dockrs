@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display, ops::Deref};
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions, LogOutput,
-        StartContainerOptions,
+        LogsOptions, StartContainerOptions,
     },
     image::CreateImageOptions,
     service::PortBinding,
@@ -276,6 +276,31 @@ pub async fn stop(docker: &Docker, containers: &[String]) -> Result<()> {
         });
 
     ensure!(!err, "Failed to stop containers");
+
+    Ok(())
+}
+
+pub async fn logs(
+    docker: &Docker,
+    container: &str,
+    follow: bool,
+    tail: Option<usize>,
+) -> Result<()> {
+    let options = LogsOptions::<String> {
+        follow,
+        stdout: true,
+        stderr: true,
+        tail: tail.map(|t| t.to_string()).unwrap_or_default(),
+        ..Default::default()
+    };
+
+    let mut stream = docker.logs(container, Some(options));
+
+    while let Some(info) = stream.next().await {
+        let info = info?;
+
+        print!("{}", info);
+    }
 
     Ok(())
 }
