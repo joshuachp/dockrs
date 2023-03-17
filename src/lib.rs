@@ -1,8 +1,13 @@
-use bollard::container::{
-    AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
-    StartContainerOptions,
+use std::{collections::HashMap, fmt::Display, ops::Deref};
+
+use bollard::{
+    container::{
+        AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
+        StartContainerOptions,
+    },
+    service::PortBinding,
 };
-use color_eyre::Result;
+use color_eyre::{eyre::ContextCompat, Result};
 use futures::StreamExt;
 use tracing::{instrument, warn};
 
@@ -18,6 +23,46 @@ pub fn connect_to_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()?;
 
     Ok(docker)
+}
+
+pub fn get_port_bindings<T: Deref<Target = str> + Display>(
+    input: &[T],
+) -> color_eyre::Result<HashMap<String, Option<Vec<PortBinding>>>> {
+    let mut bindings = HashMap::new();
+
+    for input in input {
+        let mut parts = input.rsplitn(3, ':');
+
+        let first = parts
+            .next()
+            .wrap_err_with(|| format!("Invalid port binding {}", input))?;
+
+        let second = parts.next();
+        let third = parts.next();
+
+        let entry = bindings
+            .entry(first.to_string())
+            .or_insert_with(|| Some(vec![]));
+
+        match (second, third) {
+            (None, None) => {}
+            (Some(second), None) => {
+                entry.as_mut().unwrap().push(PortBinding {
+                    host_ip: None,
+                    host_port: Some(second.to_string()),
+                });
+            }
+            (Some(second), Some(third)) => {
+                entry.as_mut().unwrap().push(PortBinding {
+                    host_ip: Some(third.to_string()),
+                    host_port: Some(second.to_string()),
+                });
+            }
+            _ => unreachable!("Invalid port binding {}", input),
+        }
+    }
+
+    Ok(bindings)
 }
 
 #[instrument(skip(options, config))]
@@ -131,5 +176,32 @@ mod test {
                 assert!(result.is_ok(), "run failed with {:?}", result);
             }
         );
+    }
+
+    #[test]
+    fn test_get_port_binding() {
+        let input = ["80", "443:8080", "127.0.0.1:80:8080"];
+
+        let binginds = get_port_bindings(&input).unwrap();
+
+        let expected = [
+            ("80".to_string(), Some(vec![])),
+            (
+                "8080".to_string(),
+                Some(vec![
+                    PortBinding {
+                        host_ip: None,
+                        host_port: Some("443".to_string()),
+                    },
+                    PortBinding {
+                        host_ip: Some("127.0.0.1".to_string()),
+                        host_port: Some("80".to_string()),
+                    },
+                ]),
+            ),
+        ];
+        let expected = HashMap::from(expected);
+
+        assert_eq!(binginds, expected);
     }
 }

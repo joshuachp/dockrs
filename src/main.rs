@@ -4,7 +4,7 @@ use color_eyre::Result;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
-pub mod cli;
+mod cli;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,14 +29,4 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-
-    #[test]
-    fn test_main() {
-        // This is a test to make the coverage happy
-        assert_eq!(1, 1);
-    }
 }

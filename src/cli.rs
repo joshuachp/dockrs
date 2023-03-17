@@ -1,13 +1,12 @@
-use std::{collections::HashMap, fmt::Display, io, ops::Deref};
+use std::{collections::HashMap, io};
 
 use bollard::{
     container::{Config, CreateContainerOptions},
     models::HostConfig,
-    service::PortBinding,
 };
 use clap::{error::Result, Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
-use color_eyre::eyre::ContextCompat;
+use dockrs::get_port_bindings;
 use tracing::instrument;
 
 #[derive(Parser)]
@@ -97,77 +96,5 @@ impl<'a: 'b, 'b> TryFrom<&'a RunArgs> for Config<&'b str> {
             host_config,
             ..Default::default()
         })
-    }
-}
-
-fn get_port_bindings<T: Deref<Target = str> + Display>(
-    input: &[T],
-) -> color_eyre::Result<HashMap<String, Option<Vec<PortBinding>>>> {
-    let mut bindings = HashMap::new();
-
-    for input in input {
-        let mut parts = input.rsplitn(3, ':');
-
-        let first = parts
-            .next()
-            .wrap_err_with(|| format!("Invalid port binding {}", input))?;
-
-        let second = parts.next();
-        let third = parts.next();
-
-        let entry = bindings
-            .entry(first.to_string())
-            .or_insert_with(|| Some(vec![]));
-
-        match (second, third) {
-            (None, None) => {}
-            (Some(second), None) => {
-                entry.as_mut().unwrap().push(PortBinding {
-                    host_ip: None,
-                    host_port: Some(second.to_string()),
-                });
-            }
-            (Some(second), Some(third)) => {
-                entry.as_mut().unwrap().push(PortBinding {
-                    host_ip: Some(third.to_string()),
-                    host_port: Some(second.to_string()),
-                });
-            }
-            _ => unreachable!("Invalid port binding {}", input),
-        }
-    }
-
-    Ok(bindings)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_get_port_binding() {
-        let input = ["80", "443:8080", "127.0.0.1:80:8080"];
-
-        let binginds = get_port_bindings(&input).unwrap();
-
-        let expected = [
-            ("80".to_string(), Some(vec![])),
-            (
-                "8080".to_string(),
-                Some(vec![
-                    PortBinding {
-                        host_ip: None,
-                        host_port: Some("443".to_string()),
-                    },
-                    PortBinding {
-                        host_ip: Some("127.0.0.1".to_string()),
-                        host_port: Some("80".to_string()),
-                    },
-                ]),
-            ),
-        ];
-        let expected = HashMap::from(expected);
-
-        assert_eq!(binginds, expected);
     }
 }

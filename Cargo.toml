@@ -8,7 +8,13 @@ repository = "https://github.com/joshuachp/dockrs"
 keywords = ["docker", "cli"]
 categories = ["command-line-interface"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "dockrs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dockrs"
+path = "src/main.rs"
 
 [dependencies]
 bollard = "0.14.0"
