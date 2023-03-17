@@ -78,7 +78,7 @@ jobs:
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
       - name: Run cargo tarpaulin
-        run: cargo tarpaulin --engine llvm --locked --all-features --out lcov
+        run: cargo tarpaulin --lib --engine llvm --locked --all-features --out lcov
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3
         with:
