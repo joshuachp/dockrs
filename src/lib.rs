@@ -139,13 +139,14 @@ pub async fn pull(docker: &Docker, image: &str, tag: &str) -> Result<()> {
 mod test {
     use super::*;
 
+    #[macro_export(crate)]
     macro_rules! docker_test {
         ($mock:expr) => {{
             #[cfg(feature = "mock")]
             let docker: Docker = $mock;
 
             #[cfg(not(feature = "mock"))]
-            let docker: Docker = connect_to_docker().unwrap();
+            let docker: Docker = $crate::connect_to_docker().unwrap();
 
             docker
         }};

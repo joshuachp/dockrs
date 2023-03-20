@@ -16,7 +16,7 @@ use futures::Stream;
 use hyper::Body;
 use mockall::mock;
 
-type DockerStrean<T> = Pin<Box<dyn Stream<Item = Result<T, Error>> + Send>>;
+type DockerStream<T> = Pin<Box<dyn Stream<Item = Result<T, Error>> + Send>>;
 
 #[async_trait]
 pub trait DockerTrait: Sized {
@@ -47,12 +47,12 @@ pub trait DockerTrait: Sized {
         options: Option<CreateImageOptions<String>>,
         root_fs: Option<Body>,
         credentials: Option<DockerCredentials>,
-    ) -> DockerStrean<CreateImageInfo>;
+    ) -> DockerStream<CreateImageInfo>;
     async fn list_containers<'a>(
         &self,
         options: Option<ListContainersOptions<&'a str>>,
     ) -> Result<Vec<ContainerSummary>, Error>;
-    fn stats(&self, container_name: &str, options: Option<StatsOptions>) -> DockerStrean<Stats>;
+    fn stats(&self, container_name: &str, options: Option<StatsOptions>) -> DockerStream<Stats>;
 }
 
 mock! {
@@ -90,11 +90,11 @@ mock! {
         options: Option<CreateImageOptions<String>>,
         root_fs: Option<Body>,
         credentials: Option<DockerCredentials>,
-    ) -> DockerStrean<CreateImageInfo>;
+    ) -> DockerStream<CreateImageInfo>;
     async fn list_containers<'a>(
         &self,
         options: Option<ListContainersOptions<&'a str>>,
     ) -> Result<Vec<ContainerSummary>, Error>;
-    fn stats(&self, container_name: &str, options: Option<StatsOptions>) -> DockerStrean<Stats>;
+    fn stats(&self, container_name: &str, options: Option<StatsOptions>) -> DockerStream<Stats>;
     }
 }

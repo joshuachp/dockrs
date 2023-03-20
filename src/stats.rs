@@ -206,3 +206,55 @@ async fn initialize_stats(docker: &Docker) -> Result<Arc<Mutex<Containers>>> {
 
     Ok(stats)
 }
+
+#[cfg(test)]
+mod test {
+    use crate::docker_test;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_stats() {
+        let docker = docker_test!({
+            let mut mock = Docker::new();
+
+            mock.expect_clone().returning(|| {
+                let mut docker = Docker::new();
+
+                docker.expect_list_containers().returning(|_| {
+                    Ok(vec![ContainerSummary {
+                        id: Some("id".to_string()),
+                        ..Default::default()
+                    }])
+                });
+
+                docker.expect_clone().returning(|| {
+                    let mut docker = Docker::new();
+                    docker
+                        .expect_stats()
+                        .returning(|_, _| futures::stream::empty().boxed());
+
+                    docker
+                });
+
+                docker
+            });
+
+            mock
+        });
+
+        let join = tokio::spawn(async move {
+            let res = stats(&docker, true).await;
+
+            assert!(res.is_ok());
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+        join.abort();
+
+        let err = join.await.unwrap_err();
+
+        assert!(err.is_cancelled());
+    }
+}
