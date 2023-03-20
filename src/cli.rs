@@ -98,3 +98,55 @@ impl<'a: 'b, 'b> TryFrom<&'a RunArgs> for Config<&'b str> {
         })
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_option_from_run_args() {
+        let args = RunArgs {
+            image: "alpine".to_string(),
+            name: Some("test".to_string()),
+            network: None,
+            volume: vec![],
+            publish: vec![],
+            expose: vec![],
+            rm: false,
+        };
+
+        let options = CreateContainerOptions::<&str> {
+            name: "test",
+            ..Default::default()
+        };
+
+        assert_eq!(Some(options), (&args).into());
+    }
+
+    #[test]
+    fn test_config_from_run_args() {
+        let args = RunArgs {
+            image: "alpine".to_string(),
+            name: Some("test".to_string()),
+            network: None,
+            volume: vec![],
+            publish: vec![],
+            expose: vec![],
+            rm: false,
+        };
+
+        let config = Config::<&str> {
+            image: Some("alpine"),
+            exposed_ports: Some(HashMap::new()),
+            host_config: Some(HostConfig {
+                binds: Some(vec![]),
+                port_bindings: Some(HashMap::new()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(config, Config::try_from(&args).unwrap());
+    }
+}
