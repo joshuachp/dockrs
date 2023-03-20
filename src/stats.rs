@@ -1,17 +1,20 @@
-use std::{collections::HashMap, io::stdout, sync::Arc};
+use std::{collections::HashMap, io::stdout, ops::DerefMut, sync::Arc};
 
 use bollard::{
     container::{ListContainersOptions, Stats, StatsOptions},
     service::ContainerSummary,
 };
-use color_eyre::{eyre::ContextCompat, Result};
+use color_eyre::{
+    eyre::{Context, ContextCompat},
+    Result,
+};
 use crossterm::{
     cursor::MoveToRow,
     execute,
     terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures::StreamExt;
-use tokio::{signal::ctrl_c, sync::Mutex};
+use tokio::{signal::ctrl_c, sync::Mutex, task::JoinHandle};
 use tracing::{debug, error, info, instrument, trace};
 
 #[cfg(feature = "mock")]
@@ -21,12 +24,14 @@ use bollard::Docker;
 
 struct Containers {
     stats: HashMap<String, Arc<Mutex<Option<Stats>>>>,
+    joins: Vec<JoinHandle<Result<()>>>,
 }
 
 impl Containers {
     fn new() -> Self {
         Self {
             stats: HashMap::new(),
+            joins: Vec::new(),
         }
     }
 
@@ -50,11 +55,17 @@ impl Containers {
             let dc_clone = docker.clone();
             let id_c = id.to_string();
 
-            tokio::spawn(async move {
-                if let Err(err) = recv_stats(&dc_clone, &id_c, options, stat).await {
-                    error!(?err, "Error while receiving stats for container {}", id_c);
+            let join = tokio::spawn(async move {
+                let res = recv_stats(&dc_clone, &id_c, options, stat).await;
+
+                if let Err(ref e) = res {
+                    error!(?e, "Error while receiving stats");
                 }
+
+                res
             });
+
+            self.joins.push(join);
         }
 
         Ok(())
@@ -150,8 +161,36 @@ pub async fn stats(docker: &Docker, keep_screen: bool) -> Result<()> {
             );
         }
 
+        check_failed(stats.lock().await.deref_mut()).await?;
+
         interval.tick().await;
     }
+}
+
+/// Check if any of the threads has failed
+async fn check_failed(stats: &mut Containers) -> Result<()> {
+    let (finished, running) = stats.joins.drain(..).fold(
+        (Vec::new(), Vec::new()),
+        |(mut finished, mut running), join| {
+            if join.is_finished() {
+                finished.push(join);
+            } else {
+                running.push(join);
+            }
+
+            (finished, running)
+        },
+    );
+
+    for join in finished {
+        join.await
+            .wrap_err("Erro joining thread")?
+            .wrap_err("Error in task")?;
+    }
+
+    stats.joins.extend(running);
+
+    Ok(())
 }
 
 #[instrument]
@@ -173,7 +212,7 @@ async fn initialize_stats(docker: &Docker) -> Result<Arc<Mutex<Containers>>> {
     let stats_clone = stats.clone();
 
     let docker = docker.clone();
-    tokio::spawn(async move {
+    let join: JoinHandle<Result<()>> = tokio::spawn(async move {
         let span = tracing::trace_span!("update_containers");
         let _enter = span.enter();
 
@@ -183,8 +222,7 @@ async fn initialize_stats(docker: &Docker) -> Result<Arc<Mutex<Containers>>> {
                 Err(e) => {
                     error!(?e, "Failed to list containers");
 
-                    interval.tick().await;
-                    continue;
+                    return Err(e.into());
                 }
             };
 
@@ -198,11 +236,15 @@ async fn initialize_stats(docker: &Docker) -> Result<Arc<Mutex<Containers>>> {
 
             if let Err(e) = res {
                 error!(?e, "Failed to update containers");
+
+                return Err(e);
             }
 
             interval.tick().await;
         }
     });
+
+    stats.lock().await.joins.push(join);
 
     Ok(stats)
 }
@@ -255,6 +297,10 @@ mod test {
 
         let err = join.await.unwrap_err();
 
-        assert!(err.is_cancelled());
+        assert!(
+            err.is_cancelled(),
+            "Thread panicked or error occurred {:?}",
+            err
+        );
     }
 }
