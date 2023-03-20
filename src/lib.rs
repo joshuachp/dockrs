@@ -145,7 +145,7 @@ pub async fn run(
         }
     }
 
-    let join = attach_container(&docker, &container.id, false).await?;
+    let join = attach_container(docker, &container.id, false).await?;
 
     docker
         .start_container(&container.id, None::<StartContainerOptions<&str>>)
@@ -178,13 +178,16 @@ pub async fn pull(docker: &Docker, image: &str, tag: &str) -> Result<()> {
 }
 
 #[instrument]
-pub async fn start(containers: &[String], attach: bool, interactive: bool) -> Result<()> {
+pub async fn start(
+    docker: &Docker,
+    containers: &[String],
+    attach: bool,
+    interactive: bool,
+) -> Result<()> {
     ensure!(
         containers.len() == 1 || (!attach && !interactive),
         "Can only attach to one container at a time"
     );
-
-    let docker = connect_to_docker()?;
 
     let options = StartContainerOptions::<&str> {
         ..Default::default()
@@ -193,7 +196,7 @@ pub async fn start(containers: &[String], attach: bool, interactive: bool) -> Re
     let mut attach_join: Vec<JoinHandle<Result<()>>> = Vec::new();
     if attach || interactive {
         for container in containers {
-            attach_join = attach_container(&docker, container, interactive).await?;
+            attach_join = attach_container(docker, container, interactive).await?;
         }
     }
 
@@ -208,19 +211,26 @@ pub async fn start(containers: &[String], attach: bool, interactive: bool) -> Re
         })
     });
 
-    for join in join_all(starts).await {
-        match join {
+    let err = join_all(starts)
+        .await
+        .iter()
+        .fold(false, |acc, join| match join {
             Ok((container, Ok(()))) => {
                 println!("{container}");
+                acc
             }
             Ok((container, Err(err))) => {
                 error!(?container, ?err, "Failed to start container");
+                acc
             }
             Err(e) => {
                 error!(?e, "Failed to start container");
+
+                true
             }
-        }
-    }
+        });
+
+    ensure!(!err, "Failed to start containers");
 
     if attach || interactive {
         for join in join_all(attach_join).await {
@@ -382,5 +392,32 @@ mod test {
         let result = pull(&docker, image, tag).await;
 
         assert!(result.is_ok(), "pull failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_start() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_clone().return_once(|| {
+                let mut mock = MockDocker::new();
+
+                mock.expect_start_container().return_once(|_, _| Ok(()));
+
+                mock
+            });
+
+            mock
+        });
+
+        let containers = vec!["test".to_string()];
+        let attach = false;
+        let interactive = false;
+
+        let result = start(&docker, &containers, attach, interactive).await;
+
+        assert!(result.is_ok(), "start failed with {:?}", result);
     }
 }

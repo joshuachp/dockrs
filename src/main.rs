@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
             containers,
             attach,
             interactive,
-        } => dockrs::start(&containers, attach, interactive).await?,
+        } => dockrs::start(&docker, &containers, attach, interactive).await?,
         Command::Stop { containers } => dockrs::stop(&containers).await?,
         Command::Completion { .. } => unreachable!(),
     }
