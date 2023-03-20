@@ -198,6 +198,8 @@ pub async fn list(docker: &Docker, all: bool, size: bool, filters: &[String]) ->
 
 #[cfg(test)]
 mod test {
+    use crate::docker_test;
+
     use super::*;
 
     #[test]
@@ -218,5 +220,22 @@ mod test {
         let expected = "1.12kB";
 
         assert_eq!(size.to_string(), expected);
+    }
+
+    #[tokio::test]
+    async fn test_list() -> Result<()> {
+        let docker = docker_test!({
+            use crate::mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_list_containers().returning(|_| Ok(vec![]));
+
+            mock
+        });
+
+        list(&docker, false, true, &[]).await?;
+
+        Ok(())
     }
 }
