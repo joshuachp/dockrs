@@ -221,7 +221,8 @@ pub async fn start(
             }
             Ok((container, Err(err))) => {
                 error!(?container, ?err, "Failed to start container");
-                acc
+
+                true
             }
             Err(e) => {
                 error!(?e, "Failed to start container");
@@ -241,9 +242,7 @@ pub async fn start(
     Ok(())
 }
 
-pub async fn stop(containers: &[String]) -> Result<()> {
-    let docker = connect_to_docker()?;
-
+pub async fn stop(docker: &Docker, containers: &[String]) -> Result<()> {
     let stops = containers.iter().map(|container| {
         let docker = docker.clone();
         let container = container.clone();
@@ -254,19 +253,27 @@ pub async fn stop(containers: &[String]) -> Result<()> {
         })
     });
 
-    for join in join_all(stops).await {
-        match join {
+    let err = join_all(stops)
+        .await
+        .iter()
+        .fold(false, |err, join| match join {
             Ok((container, Ok(()))) => {
                 println!("{container}");
+
+                err
             }
             Ok((container, Err(err))) => {
                 error!(?container, ?err, "Failed to stop container");
+
+                true
             }
             Err(e) => {
                 error!(?e, "Failed to stop container");
+                true
             }
-        }
-    }
+        });
+
+    ensure!(!err, "Failed to stop containers");
 
     Ok(())
 }
@@ -419,5 +426,30 @@ mod test {
         let result = start(&docker, &containers, attach, interactive).await;
 
         assert!(result.is_ok(), "start failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_stop() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_clone().return_once(|| {
+                let mut mock = MockDocker::new();
+
+                mock.expect_stop_container().return_once(|_, _| Ok(()));
+
+                mock
+            });
+
+            mock
+        });
+
+        let containers = vec!["test".to_string()];
+
+        let result = stop(&docker, &containers).await;
+
+        assert!(result.is_ok(), "stop failed with {:?}", result);
     }
 }
