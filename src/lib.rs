@@ -1,5 +1,7 @@
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 
+#[cfg(not(feature = "mock"))]
+use bollard::Docker;
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
@@ -9,15 +11,13 @@ use bollard::{
 };
 use color_eyre::{eyre::ContextCompat, Result};
 use futures::StreamExt;
-use tracing::{instrument, warn};
-
-#[cfg(feature = "mock")]
-mod mock;
-
-#[cfg(not(feature = "mock"))]
-use bollard::Docker;
 #[cfg(feature = "mock")]
 use mock::{Docker as DockerTrait, MockDocker as Docker};
+use tracing::{instrument, warn};
+
+pub mod cli;
+#[cfg(feature = "mock")]
+mod mock;
 
 pub fn connect_to_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()?;

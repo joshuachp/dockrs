@@ -1,10 +1,8 @@
 use clap::Parser;
-use cli::Cli;
 use color_eyre::Result;
+use dockrs::cli::{Cli, Command};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
-
-mod cli;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,8 +22,8 @@ async fn main() -> Result<()> {
         .init();
 
     match cli.subcommand {
-        cli::Command::Run(ref run) => dockrs::run(run.into(), run.try_into()?, run.rm).await?,
-        cli::Command::Completion { shell } => Cli::generate_completion(shell),
+        Command::Run(ref run) => dockrs::run(run.into(), run.try_into()?, run.rm).await?,
+        Command::Completion { shell } => Cli::generate_completion(shell),
     }
 
     Ok(())

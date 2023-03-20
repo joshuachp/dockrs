@@ -30,8 +30,6 @@ async-trait = "0.1.66"
 pretty_assertions = "1.3.0"
 
 [features]
-# TODO: Remove this feature once the mock is no longer needed
-default = ["mock"]
 mock =["mockall"]
 
 [dev-dependencies]

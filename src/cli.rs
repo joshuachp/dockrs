@@ -1,12 +1,12 @@
 use std::{collections::HashMap, io};
 
+use crate::get_port_bindings;
 use bollard::{
     container::{Config, CreateContainerOptions},
     models::HostConfig,
 };
 use clap::{error::Result, Args, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
-use dockrs::get_port_bindings;
 use tracing::instrument;
 
 #[derive(Parser)]
