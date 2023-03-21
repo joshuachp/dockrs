@@ -108,6 +108,11 @@ pub enum Command {
         #[arg(long, short)]
         force: bool,
     },
+    /// Get real time events from the server
+    Events {
+        /// Filter output based on conditions provided
+        filter: Vec<String>,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }

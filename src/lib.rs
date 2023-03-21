@@ -7,12 +7,15 @@ use bollard::{
     },
     image::{CreateImageOptions, RemoveImageOptions},
     service::PortBinding,
+    system::EventsOptions,
 };
+use chrono::Local;
 use color_eyre::{eyre::ensure, eyre::ContextCompat, Result};
 use futures::{future::join_all, StreamExt};
 
 #[cfg(not(feature = "mock"))]
 use bollard::Docker;
+use list::parse_filter;
 #[cfg(feature = "mock")]
 use mock::{DockerTrait, MockDocker as Docker};
 
@@ -401,6 +404,69 @@ pub async fn rmi(docker: &Docker, images: &[String], force: bool) -> Result<()> 
     Ok(())
 }
 
+#[instrument(skip(docker))]
+pub async fn events(docker: &Docker, filter: &[String]) -> Result<()> {
+    let filters: HashMap<&str, Vec<&str>> =
+        filter
+            .iter()
+            .try_fold(HashMap::new(), |mut acc, filter| -> Result<_> {
+                let (filter, value) = parse_filter(filter)?;
+
+                acc.entry(filter).or_insert_with(Vec::new).push(value);
+
+                Ok(acc)
+            })?;
+
+    let options = EventsOptions {
+        filters,
+        ..Default::default()
+    };
+
+    let mut stream = docker.events(Some(options));
+
+    while let Some(event) = stream.next().await {
+        let event = event?;
+
+        let time = Local::now();
+
+        let typ = event
+            .typ
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "".to_string());
+
+        let action = event.action.unwrap_or_default();
+
+        let actor_id = event
+            .actor
+            .as_ref()
+            .and_then(|actor| actor.id.as_deref())
+            .unwrap_or("");
+
+        let actor_attributes = event
+            .actor
+            .as_ref()
+            .and_then(|actor| actor.attributes.as_ref())
+            .map(|attr| {
+                attr.iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_else(|| "".to_string());
+
+        println!(
+            "{} {} {} {} ({})",
+            time.to_rfc3339(),
+            typ,
+            action,
+            actor_id,
+            actor_attributes
+        );
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -643,5 +709,23 @@ mod test {
         let result = rmi(&docker, &["test".to_string()], true).await;
 
         assert!(result.is_ok(), "ps failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_events() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_events()
+                .return_once(|_| Box::pin(futures::stream::empty()));
+
+            mock
+        });
+
+        let result = events(&docker, &[]).await;
+
+        assert!(result.is_ok(), "events failed with {:?}", result);
     }
 }

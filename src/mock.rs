@@ -10,8 +10,9 @@ use bollard::{
     },
     errors::Error,
     image::{CreateImageOptions, RemoveImageOptions},
-    models::{ContainerCreateResponse, CreateImageInfo},
+    models::{ContainerCreateResponse, CreateImageInfo, EventMessage},
     service::{ContainerSummary, ImageDeleteResponseItem},
+    system::EventsOptions,
 };
 use futures::Stream;
 use hyper::Body;
@@ -70,6 +71,7 @@ pub trait DockerTrait: Sized {
         options: Option<RemoveImageOptions>,
         credentials: Option<DockerCredentials>,
     ) -> Result<Vec<ImageDeleteResponseItem>, Error>;
+    fn events(&self, options: Option<EventsOptions<&str>>) -> DockerStream<EventMessage>;
 }
 
 mock! {
@@ -129,5 +131,6 @@ mock! {
             options: Option<RemoveImageOptions>,
             credentials: Option<DockerCredentials>,
         ) -> Result<Vec<ImageDeleteResponseItem>, Error>;
+        fn events<'a>(&self, options: Option<EventsOptions<&'a str>>) -> DockerStream<EventMessage>;
     }
 }

@@ -8,7 +8,9 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut filter = EnvFilter::from_default_env();
+    let mut filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
 
     let cli = Cli::parse();
 
@@ -52,6 +54,7 @@ async fn main() -> Result<()> {
             link,
         } => dockrs::rm(&docker, &containers, force, volumes, link).await?,
         Command::Rmi { images, force } => dockrs::rmi(&docker, &images, force).await?,
+        Command::Events { filter } => dockrs::events(&docker, &filter).await?,
         Command::Completion { .. } => unreachable!(),
     }
 

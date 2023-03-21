@@ -127,7 +127,7 @@ impl<'a> From<&'a ContainerSummary> for Stats<'a> {
     }
 }
 
-fn parse_filter(input: &str) -> Result<(&str, &str)> {
+pub fn parse_filter(input: &str) -> Result<(&str, &str)> {
     let mut parts = input.splitn(2, '=');
 
     let filter = parts
