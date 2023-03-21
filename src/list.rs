@@ -2,11 +2,12 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use bollard::{container::ListContainersOptions, service::ContainerSummary};
 use chrono::{NaiveDateTime, Utc};
-use color_eyre::{eyre::ContextCompat, Result};
+use color_eyre::Result;
 use prettytable::{format::FormatBuilder, Row, Table};
 
 #[cfg(feature = "mock")]
 use crate::mock::{DockerTrait, MockDocker as Docker};
+use crate::parse_filter;
 #[cfg(not(feature = "mock"))]
 use bollard::Docker;
 
@@ -127,20 +128,6 @@ impl<'a> From<&'a ContainerSummary> for Stats<'a> {
     }
 }
 
-pub fn parse_filter(input: &str) -> Result<(&str, &str)> {
-    let mut parts = input.splitn(2, '=');
-
-    let filter = parts
-        .next()
-        .wrap_err_with(|| format!("Invalid filter {}", input))?;
-
-    let value = parts
-        .next()
-        .wrap_err_with(|| format!("Invalid filter {}", input))?;
-
-    Ok((filter, value))
-}
-
 pub async fn list(docker: &Docker, all: bool, size: bool, filters: &[String]) -> Result<()> {
     let filters: HashMap<&str, Vec<&str>> =
         filters
@@ -201,17 +188,6 @@ mod test {
     use crate::docker_test;
 
     use super::*;
-
-    #[test]
-    fn test_parse_filter() {
-        let input = "label=foo=bar";
-
-        let filter = parse_filter(input).unwrap();
-
-        let expected = ("label", "foo=bar");
-
-        assert_eq!(filter, expected);
-    }
 
     #[test]
     fn test_size_display() {

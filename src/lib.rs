@@ -15,7 +15,6 @@ use futures::{future::join_all, StreamExt};
 
 #[cfg(not(feature = "mock"))]
 use bollard::Docker;
-use list::parse_filter;
 #[cfg(feature = "mock")]
 use mock::{DockerTrait, MockDocker as Docker};
 
@@ -78,6 +77,20 @@ pub fn get_port_bindings<T: Deref<Target = str> + Display>(
     }
 
     Ok(bindings)
+}
+
+pub fn parse_filter(input: &str) -> Result<(&str, &str)> {
+    let mut parts = input.splitn(2, '=');
+
+    let filter = parts
+        .next()
+        .wrap_err_with(|| format!("Invalid filter {}", input))?;
+
+    let value = parts
+        .next()
+        .wrap_err_with(|| format!("Invalid filter {}", input))?;
+
+    Ok((filter, value))
 }
 
 async fn attach_container(
@@ -526,6 +539,17 @@ mod test {
         )];
 
         assert_eq!(binginds, HashMap::from(expected));
+    }
+
+    #[test]
+    fn test_parse_filter() {
+        let input = "label=foo=bar";
+
+        let filter = parse_filter(input).unwrap();
+
+        let expected = ("label", "foo=bar");
+
+        assert_eq!(filter, expected);
     }
 
     #[tokio::test]
