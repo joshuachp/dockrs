@@ -1,3 +1,5 @@
+use std::env;
+
 use clap::Parser;
 use color_eyre::{eyre::Context, Result};
 use dockrs::cli::{Cli, Command};
@@ -8,8 +10,8 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut filter =
-        EnvFilter::try_from_default_env().wrap_err("Failed to parse RUST_LOG env var")?;
+    let mut filter = EnvFilter::try_new(env::var("RUST_LOG").as_deref().unwrap_or(""))
+        .wrap_err("Failed to parse RUST_LOG env var")?;
 
     let cli = Cli::parse();
 

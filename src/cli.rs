@@ -16,7 +16,7 @@ pub struct Cli {
     pub subcommand: Command,
 
     /// Enable debug logging
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub debug: bool,
 }
 
