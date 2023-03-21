@@ -328,19 +328,28 @@ pub async fn rm(
         })
     });
 
-    for join in join_all(removes).await {
-        match join {
+    let err = join_all(removes)
+        .await
+        .iter()
+        .fold(false, |err, join| match join {
             Ok((container, Ok(()))) => {
                 println!("{container}");
+
+                err
             }
             Ok((container, Err(err))) => {
                 error!(?container, ?err, "Failed to remove container");
+
+                true
             }
             Err(e) => {
                 error!(?e, "Failed to remove container");
+
+                true
             }
-        }
-    }
+        });
+
+    ensure!(!err, "Failed to remove containers");
 
     Ok(())
 }
@@ -358,27 +367,36 @@ pub async fn rmi(docker: &Docker, images: &[String], force: bool) -> Result<()> 
         tokio::spawn(async move { docker.remove_image(&image, Some(options), None).await })
     });
 
-    for join in join_all(removes).await {
-        match join {
+    let err = join_all(removes)
+        .await
+        .iter()
+        .fold(false, |err, join| match join {
             Ok(Ok(responses)) => {
-                for resp in responses {
-                    if let Some(untaged) = resp.untagged {
+                responses.iter().for_each(|resp| {
+                    if let Some(untaged) = &resp.untagged {
                         println!("Untagged: {}", untaged);
                     }
 
-                    if let Some(deleted) = resp.deleted {
+                    if let Some(deleted) = &resp.deleted {
                         println!("Deleted: {}", deleted);
                     }
-                }
+                });
+
+                err
             }
             Ok(Err(err)) => {
                 error!(?err, "Failed to remove image");
+
+                true
             }
             Err(e) => {
                 error!(?e, "Failed to remove image");
+
+                true
             }
-        }
-    }
+        });
+
+    ensure!(!err, "Failed to remove images");
 
     Ok(())
 }
@@ -578,5 +596,52 @@ mod test {
         let result = logs(&docker, container, follow, tail).await;
 
         assert!(result.is_ok(), "logs failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_remove() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_clone().returning(|| {
+                let mut mock = MockDocker::new();
+                mock.expect_remove_container().return_once(|_, _| Ok(()));
+
+                mock
+            });
+
+            mock
+        });
+
+        let containers = vec!["test".to_string()];
+
+        let result = rm(&docker, &containers, true, true, true).await;
+
+        assert!(result.is_ok(), "remove failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_rmi() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_clone().return_once(|| {
+                let mut mock = MockDocker::new();
+
+                mock.expect_remove_image().return_once(|_, _, _| Ok(vec![]));
+
+                mock
+            });
+
+            mock
+        });
+
+        let result = rmi(&docker, &["test".to_string()], true).await;
+
+        assert!(result.is_ok(), "ps failed with {:?}", result);
     }
 }
