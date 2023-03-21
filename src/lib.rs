@@ -479,4 +479,26 @@ mod test {
 
         assert!(result.is_ok(), "stop failed with {:?}", result);
     }
+
+    #[tokio::test]
+    async fn test_logs() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_logs()
+                .return_once(|_, _| Box::pin(futures::stream::empty()));
+
+            mock
+        });
+
+        let container = "test";
+        let follow = false;
+        let tail = None;
+
+        let result = logs(&docker, container, follow, tail).await;
+
+        assert!(result.is_ok(), "logs failed with {:?}", result);
+    }
 }

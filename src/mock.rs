@@ -59,7 +59,7 @@ pub trait DockerTrait: Sized {
         container_name: &str,
         options: Option<StopContainerOptions>,
     ) -> Result<(), Error>;
-    fn logs<'a>(
+    fn logs(
         &self,
         container_name: &str,
         options: Option<LogsOptions<String>>,
