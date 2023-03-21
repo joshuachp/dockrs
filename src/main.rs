@@ -1,5 +1,5 @@
 use clap::Parser;
-use color_eyre::Result;
+use color_eyre::{eyre::Context, Result};
 use dockrs::cli::{Cli, Command};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
@@ -8,9 +8,8 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut filter = EnvFilter::builder()
-        .with_default_directive(LevelFilter::INFO.into())
-        .from_env_lossy();
+    let mut filter =
+        EnvFilter::try_from_default_env().wrap_err("Failed to parse RUST_LOG env var")?;
 
     let cli = Cli::parse();
 
