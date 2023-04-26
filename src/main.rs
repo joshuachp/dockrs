@@ -33,6 +33,12 @@ async fn main() -> Result<()> {
         Command::Run(ref run) => dockrs::run(&docker, run.into(), run.try_into()?, run.rm).await?,
         Command::Pull { image, tag } => dockrs::pull(&docker, &image, &tag).await?,
         Command::Stats { keep_screen } => dockrs::stats(&docker, keep_screen).await?,
+        Command::Start {
+            containers,
+            attach,
+            interactive,
+        } => dockrs::start(&docker, &containers, attach, interactive).await?,
+        Command::Stop { containers } => dockrs::stop(&docker, &containers).await?,
         Command::Completion { .. } => unreachable!(),
     }
 
