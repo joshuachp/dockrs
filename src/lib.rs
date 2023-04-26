@@ -484,7 +484,7 @@ pub async fn events(docker: &Docker, filter: &[String]) -> Result<()> {
 mod test {
     use super::*;
 
-    #[macro_export(crate)]
+    #[macro_export]
     macro_rules! docker_test {
         ($mock:expr) => {{
             #[cfg(feature = "mock")]
