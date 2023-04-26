@@ -8,12 +8,28 @@ repository = "https://github.com/joshuachp/dockrs"
 keywords = ["docker", "cli"]
 categories = ["command-line-interface"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "dockrs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dockrs"
+path = "src/main.rs"
 
 [dependencies]
+bollard = "0.14.0"
 clap = { version = "4.1.8", features = ["derive"] }
 clap_complete = "4.1.4"
 color-eyre = "0.6.2"
+futures = "0.3.27"
 tokio = { version = "1.26.0", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+mockall = {version = "0.11.3", optional = true}
+async-trait = "0.1.66"
+pretty_assertions = "1.3.0"
+
+[features]
+mock =["mockall"]
+
+[dev-dependencies]
