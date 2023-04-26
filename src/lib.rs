@@ -3,9 +3,9 @@ use std::{collections::HashMap, fmt::Display, ops::Deref};
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions, LogOutput,
-        LogsOptions, StartContainerOptions,
+        LogsOptions, RemoveContainerOptions, StartContainerOptions,
     },
-    image::CreateImageOptions,
+    image::{CreateImageOptions, RemoveImageOptions},
     service::PortBinding,
 };
 use color_eyre::{eyre::ensure, eyre::ContextCompat, Result};
@@ -305,6 +305,102 @@ pub async fn logs(
     Ok(())
 }
 
+pub async fn rm(
+    docker: &Docker,
+    containers: &[String],
+    force: bool,
+    volumes: bool,
+    link: bool,
+) -> Result<()> {
+    let options = RemoveContainerOptions {
+        force,
+        v: volumes,
+        link,
+    };
+
+    let removes = containers.iter().map(|container| {
+        let docker = docker.clone();
+        let container = container.clone();
+
+        tokio::spawn(async move {
+            let res = docker.remove_container(&container, Some(options)).await;
+            (container, res)
+        })
+    });
+
+    let err = join_all(removes)
+        .await
+        .iter()
+        .fold(false, |err, join| match join {
+            Ok((container, Ok(()))) => {
+                println!("{container}");
+
+                err
+            }
+            Ok((container, Err(err))) => {
+                error!(?container, ?err, "Failed to remove container");
+
+                true
+            }
+            Err(e) => {
+                error!(?e, "Failed to remove container");
+
+                true
+            }
+        });
+
+    ensure!(!err, "Failed to remove containers");
+
+    Ok(())
+}
+
+pub async fn rmi(docker: &Docker, images: &[String], force: bool) -> Result<()> {
+    let options = RemoveImageOptions {
+        force,
+        ..Default::default()
+    };
+
+    let removes = images.iter().map(|image| {
+        let docker = docker.clone();
+        let image = image.clone();
+
+        tokio::spawn(async move { docker.remove_image(&image, Some(options), None).await })
+    });
+
+    let err = join_all(removes)
+        .await
+        .iter()
+        .fold(false, |err, join| match join {
+            Ok(Ok(responses)) => {
+                responses.iter().for_each(|resp| {
+                    if let Some(untaged) = &resp.untagged {
+                        println!("Untagged: {}", untaged);
+                    }
+
+                    if let Some(deleted) = &resp.deleted {
+                        println!("Deleted: {}", deleted);
+                    }
+                });
+
+                err
+            }
+            Ok(Err(err)) => {
+                error!(?err, "Failed to remove image");
+
+                true
+            }
+            Err(e) => {
+                error!(?e, "Failed to remove image");
+
+                true
+            }
+        });
+
+    ensure!(!err, "Failed to remove images");
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -500,5 +596,52 @@ mod test {
         let result = logs(&docker, container, follow, tail).await;
 
         assert!(result.is_ok(), "logs failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_remove() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_clone().returning(|| {
+                let mut mock = MockDocker::new();
+                mock.expect_remove_container().return_once(|_, _| Ok(()));
+
+                mock
+            });
+
+            mock
+        });
+
+        let containers = vec!["test".to_string()];
+
+        let result = rm(&docker, &containers, true, true, true).await;
+
+        assert!(result.is_ok(), "remove failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_rmi() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_clone().return_once(|| {
+                let mut mock = MockDocker::new();
+
+                mock.expect_remove_image().return_once(|_, _, _| Ok(vec![]));
+
+                mock
+            });
+
+            mock
+        });
+
+        let result = rmi(&docker, &["test".to_string()], true).await;
+
+        assert!(result.is_ok(), "ps failed with {:?}", result);
     }
 }

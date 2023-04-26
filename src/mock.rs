@@ -9,9 +9,9 @@ use bollard::{
         StartContainerOptions, Stats, StatsOptions, StopContainerOptions,
     },
     errors::Error,
-    image::CreateImageOptions,
+    image::{CreateImageOptions, RemoveImageOptions},
     models::{ContainerCreateResponse, CreateImageInfo},
-    service::ContainerSummary,
+    service::{ContainerSummary, ImageDeleteResponseItem},
 };
 use futures::Stream;
 use hyper::Body;
@@ -64,6 +64,12 @@ pub trait DockerTrait: Sized {
         container_name: &str,
         options: Option<LogsOptions<String>>,
     ) -> DockerStream<LogOutput>;
+    async fn remove_image(
+        &self,
+        image_name: &str,
+        options: Option<RemoveImageOptions>,
+        credentials: Option<DockerCredentials>,
+    ) -> Result<Vec<ImageDeleteResponseItem>, Error>;
 }
 
 mock! {
@@ -117,5 +123,11 @@ mock! {
             container_name: &str,
             options: Option<LogsOptions<String>>,
         ) -> DockerStream<LogOutput>;
+        async fn remove_image(
+            &self,
+            image_name: &str,
+            options: Option<RemoveImageOptions>,
+            credentials: Option<DockerCredentials>,
+        ) -> Result<Vec<ImageDeleteResponseItem>, Error>;
     }
 }
