@@ -16,7 +16,7 @@ pub struct Cli {
     pub subcommand: Command,
 
     /// Enable debug logging
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub debug: bool,
 }
 
@@ -107,6 +107,11 @@ pub enum Command {
         /// Force removal of the image
         #[arg(long, short)]
         force: bool,
+    },
+    /// Get real time events from the server
+    Events {
+        /// Filter output based on conditions provided
+        filter: Vec<String>,
     },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },

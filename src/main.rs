@@ -1,5 +1,7 @@
+use std::env;
+
 use clap::Parser;
-use color_eyre::Result;
+use color_eyre::{eyre::Context, Result};
 use dockrs::cli::{Cli, Command};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
@@ -8,7 +10,8 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let mut filter = EnvFilter::from_default_env();
+    let mut filter = EnvFilter::try_new(env::var("RUST_LOG").as_deref().unwrap_or(""))
+        .wrap_err("Failed to parse RUST_LOG env var")?;
 
     let cli = Cli::parse();
 
@@ -52,6 +55,7 @@ async fn main() -> Result<()> {
             link,
         } => dockrs::rm(&docker, &containers, force, volumes, link).await?,
         Command::Rmi { images, force } => dockrs::rmi(&docker, &images, force).await?,
+        Command::Events { filter } => dockrs::events(&docker, &filter).await?,
         Command::Completion { .. } => unreachable!(),
     }
 
