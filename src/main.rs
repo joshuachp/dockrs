@@ -39,6 +39,7 @@ async fn main() -> Result<()> {
             interactive,
         } => dockrs::start(&docker, &containers, attach, interactive).await?,
         Command::Stop { containers } => dockrs::stop(&docker, &containers).await?,
+        Command::Ps { all, size, filter } => dockrs::list(&docker, all, size, &filter).await?,
         Command::Completion { .. } => unreachable!(),
     }
 

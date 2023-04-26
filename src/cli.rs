@@ -61,6 +61,18 @@ pub enum Command {
         #[arg(required = true)]
         containers: Vec<String>,
     },
+    /// List containers
+    Ps {
+        /// Show all containers (default shows just running)
+        #[arg(long, short)]
+        all: bool,
+        /// Display total file
+        #[arg(long)]
+        size: bool,
+        /// Filter output based on conditions provided
+        #[arg(long, short)]
+        filter: Vec<String>,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }

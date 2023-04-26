@@ -17,12 +17,14 @@ name = "dockrs"
 path = "src/main.rs"
 
 [dependencies]
-bollard = "0.14.0"
+bollard = {version = "0.14.0", features = ["chrono"] }
+chrono = "0.4.24"
 clap = { version = "4.1.8", features = ["derive"] }
 clap_complete = "4.1.4"
 color-eyre = "0.6.2"
 crossterm = "0.26.1"
 futures = "0.3.27"
+prettytable-rs = "0.10.0"
 tokio = { version = "1.26.0", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
