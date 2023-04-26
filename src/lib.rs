@@ -1,7 +1,5 @@
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 
-#[cfg(not(feature = "mock"))]
-use bollard::Docker;
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
@@ -12,13 +10,20 @@ use bollard::{
 };
 use color_eyre::{eyre::ContextCompat, Result};
 use futures::StreamExt;
+
+#[cfg(not(feature = "mock"))]
+use bollard::Docker;
 #[cfg(feature = "mock")]
-use mock::{Docker as DockerTrait, MockDocker as Docker};
-use tracing::{instrument, warn};
+use mock::{DockerTrait, MockDocker as Docker};
+
+pub use stats::stats;
 
 pub mod cli;
 #[cfg(feature = "mock")]
 mod mock;
+mod stats;
+
+use tracing::{instrument, warn};
 
 pub fn connect_to_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()?;
@@ -132,16 +137,16 @@ pub async fn pull(docker: &Docker, image: &str, tag: &str) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
+    #[macro_export(crate)]
     macro_rules! docker_test {
         ($mock:expr) => {{
-            let docker: Docker = if cfg!(feature = "mock") {
-                $mock
-            } else {
-                connect_to_docker().unwrap()
-            };
+            #[cfg(feature = "mock")]
+            let docker: Docker = $mock;
+
+            #[cfg(not(feature = "mock"))]
+            let docker: Docker = $crate::connect_to_docker().unwrap();
 
             docker
         }};
