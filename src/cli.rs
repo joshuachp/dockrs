@@ -30,6 +30,13 @@ impl Cli {
 pub enum Command {
     /// Create and run a new container from an image
     Run(RunArgs),
+    Pull {
+        /// The image to pull
+        image: String,
+        /// The tag to pull
+        #[arg(short, long, default_value = "latest")]
+        tag: String,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }

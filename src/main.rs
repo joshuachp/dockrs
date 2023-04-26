@@ -21,9 +21,18 @@ async fn main() -> Result<()> {
         .with(filter)
         .init();
 
+    if let Command::Completion { shell } = cli.subcommand {
+        Cli::generate_completion(shell);
+
+        return Ok(());
+    }
+
+    let docker = dockrs::connect_to_docker()?;
+
     match cli.subcommand {
-        Command::Run(ref run) => dockrs::run(run.into(), run.try_into()?, run.rm).await?,
-        Command::Completion { shell } => Cli::generate_completion(shell),
+        Command::Run(ref run) => dockrs::run(&docker, run.into(), run.try_into()?, run.rm).await?,
+        Command::Pull { image, tag } => dockrs::pull(&docker, &image, &tag).await?,
+        Command::Completion { .. } => unreachable!(),
     }
 
     Ok(())

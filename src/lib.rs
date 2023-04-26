@@ -7,6 +7,7 @@ use bollard::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions,
         StartContainerOptions,
     },
+    image::CreateImageOptions,
     service::PortBinding,
 };
 use color_eyre::{eyre::ContextCompat, Result};
@@ -67,12 +68,11 @@ pub fn get_port_bindings<T: Deref<Target = str> + Display>(
 
 #[instrument(skip(options, config))]
 pub async fn run(
+    docker: &Docker,
     options: Option<CreateContainerOptions<&str>>,
     config: Config<&str>,
     rm: bool,
 ) -> Result<()> {
-    let docker = connect_to_docker()?;
-
     let container = docker.create_container(options, config).await?;
 
     if !container.warnings.is_empty() {
@@ -113,69 +113,38 @@ pub async fn run(
     Ok(())
 }
 
+pub async fn pull(docker: &Docker, image: &str, tag: &str) -> Result<()> {
+    let options = CreateImageOptions {
+        from_image: format!("{}:{}", image, tag),
+        ..Default::default()
+    };
+
+    let mut stream = docker.create_image(Some(options), None, None);
+
+    while let Some(info) = stream.next().await {
+        let info = info?;
+
+        println!("{:?}", info);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
 
     use super::*;
 
     macro_rules! docker_test {
-        ($mock:expr, $test:block) => {
-            #[cfg(feature = "mock")]
-            let ctx = $mock;
+        ($mock:expr) => {{
+            let docker: Docker = if cfg!(feature = "mock") {
+                $mock
+            } else {
+                connect_to_docker().unwrap()
+            };
 
-            $test
-
-            #[cfg(feature = "mock")]
-            drop(ctx);
-        };
-    }
-
-    #[tokio::test]
-    async fn test_run() {
-        docker_test!(
-            {
-                use bollard::service::ContainerCreateResponse;
-                use mock::MockDocker;
-                use tokio::io::BufWriter;
-
-                let create_container = ContainerCreateResponse {
-                    id: "test".to_string(),
-                    warnings: vec![],
-                };
-
-                let attach_container = AttachContainerResults {
-                    input: Box::pin(BufWriter::new(Vec::new())),
-                    output: Box::pin(futures::stream::empty()),
-                };
-
-                let mut mock = MockDocker::new();
-
-                mock.expect_create_container()
-                    .return_once(|_, _| Ok(create_container));
-                mock.expect_attach_container()
-                    .return_once(|_, _| Ok(attach_container));
-                mock.expect_start_container().return_once(|_, _| Ok(()));
-                mock.expect_remove_container().return_once(|_, _| Ok(()));
-
-                let ctx = MockDocker::connect_with_local_defaults_context();
-
-                ctx.expect().return_once(move || Ok(mock));
-
-                ctx
-            },
-            {
-                let options = None;
-                let config = Config {
-                    image: Some("hello-world"),
-                    ..Default::default()
-                };
-                let rm = true;
-
-                let result = super::run(options, config, rm).await;
-
-                assert!(result.is_ok(), "run failed with {:?}", result);
-            }
-        );
+            docker
+        }};
     }
 
     #[test]
@@ -203,5 +172,84 @@ mod test {
         let expected = HashMap::from(expected);
 
         assert_eq!(binginds, expected);
+    }
+
+    #[test]
+    fn test_get_port_binding_ipv6() {
+        let input = ["[::]:443:8080"];
+
+        let binginds = get_port_bindings(&input).unwrap();
+
+        let expected = [(
+            "8080".to_string(),
+            Some(vec![PortBinding {
+                host_ip: Some("[::]".to_string()),
+                host_port: Some("443".to_string()),
+            }]),
+        )];
+
+        assert_eq!(binginds, HashMap::from(expected));
+    }
+
+    #[tokio::test]
+    async fn test_run() {
+        let docker = docker_test!({
+            use bollard::service::ContainerCreateResponse;
+            use mock::MockDocker;
+            use tokio::io::BufWriter;
+
+            let create_container = ContainerCreateResponse {
+                id: "test".to_string(),
+                warnings: vec![],
+            };
+
+            let attach_container = AttachContainerResults {
+                input: Box::pin(BufWriter::new(Vec::new())),
+                output: Box::pin(futures::stream::empty()),
+            };
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_create_container()
+                .return_once(|_, _| Ok(create_container));
+            mock.expect_attach_container()
+                .return_once(|_, _| Ok(attach_container));
+            mock.expect_start_container().return_once(|_, _| Ok(()));
+            mock.expect_remove_container().return_once(|_, _| Ok(()));
+
+            mock
+        });
+
+        let options = None;
+        let config = Config {
+            image: Some("hello-world"),
+            ..Default::default()
+        };
+        let rm = true;
+
+        let result = run(&docker, options, config, rm).await;
+
+        assert!(result.is_ok(), "run failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_pull() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_create_image()
+                .return_once(|_, _, _| Box::pin(futures::stream::empty()));
+
+            mock
+        });
+
+        let image = "hello-world";
+        let tag = "latest";
+
+        let result = pull(&docker, image, tag).await;
+
+        assert!(result.is_ok(), "pull failed with {:?}", result);
     }
 }
