@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display, ops::Deref};
 use bollard::{
     container::{
         AttachContainerOptions, AttachContainerResults, Config, CreateContainerOptions, LogOutput,
-        StartContainerOptions,
+        LogsOptions, StartContainerOptions,
     },
     image::CreateImageOptions,
     service::PortBinding,
@@ -280,6 +280,31 @@ pub async fn stop(docker: &Docker, containers: &[String]) -> Result<()> {
     Ok(())
 }
 
+pub async fn logs(
+    docker: &Docker,
+    container: &str,
+    follow: bool,
+    tail: Option<usize>,
+) -> Result<()> {
+    let options = LogsOptions::<String> {
+        follow,
+        stdout: true,
+        stderr: true,
+        tail: tail.map(|t| t.to_string()).unwrap_or_default(),
+        ..Default::default()
+    };
+
+    let mut stream = docker.logs(container, Some(options));
+
+    while let Some(info) = stream.next().await {
+        let info = info?;
+
+        print!("{}", info);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -453,5 +478,27 @@ mod test {
         let result = stop(&docker, &containers).await;
 
         assert!(result.is_ok(), "stop failed with {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_logs() {
+        let docker = docker_test!({
+            use mock::MockDocker;
+
+            let mut mock = MockDocker::new();
+
+            mock.expect_logs()
+                .return_once(|_, _| Box::pin(futures::stream::empty()));
+
+            mock
+        });
+
+        let container = "test";
+        let follow = false;
+        let tail = None;
+
+        let result = logs(&docker, container, follow, tail).await;
+
+        assert!(result.is_ok(), "logs failed with {:?}", result);
     }
 }

@@ -73,6 +73,17 @@ pub enum Command {
         #[arg(long, short)]
         filter: Vec<String>,
     },
+    /// Fetch the logs of a container
+    Logs {
+        /// The container to get logs from
+        container: String,
+        /// Follow log output
+        #[arg(long, short)]
+        follow: bool,
+        /// Display total file
+        #[arg(long, short = 'n')]
+        tail: Option<usize>,
+    },
     /// Generate shell completion for a given shell
     Completion { shell: Shell },
 }
